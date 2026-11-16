@@ -52,11 +52,11 @@ const SUPPORT_CONTACT = 'ekonomiavdelningen';
 
 1. Skapa ett repo på GitHub, till exempel `travelcost`, och pusha koden:
    ```bash
-   git remote add origin https://github.com/<org>/travelcost.git
+   git remote add origin https://github.com/totaldigital-se/travelcost.git
    git push -u origin main
    ```
 2. Gå till **Settings → Pages**. Välj *Deploy from a branch*, branch `main` och mappen `/ (root)`.
-3. Efter ungefär en minut finns sidan på `https://<org>.github.io/travelcost/`.
+3. Efter ungefär en minut finns sidan på `https://totaldigital-se.github.io/travelcost/`.
 4. Vill ni ha en egen adress, t.ex. `trakt.totaldigital.se`, anger ni den under *Custom domain* och lägger till en CNAME-post i DNS.
 5. Slå på branch protection under **Settings → Branches**, enligt avsnittet om säkerhet ovan.
 
