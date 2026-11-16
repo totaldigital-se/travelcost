@@ -1,0 +1,506 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traktamente → Timekeeper</title>
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#fff; --text:#1d2330; --muted:#677084; --line:#e2e5eb;
+  --accent:#2f6fdf; --accent-weak:#e6efff; --ok:#1f8a4c; --warn:#b26b00; --err:#c43232;
+  --full:#1f8a4c; --full-bg:#e3f4ea; --half:#b26b00; --half-bg:#fdf0dc; --none-bg:#eef0f3;
+  --meal-on:#c43232; --meal-on-bg:#fde6e6;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#14171d; --panel:#1c2028; --text:#e6e9ef; --muted:#9aa3b5; --line:#2c323d;
+    --accent:#6c9cff; --accent-weak:#22314f; --ok:#4cc584; --warn:#f0a83a; --err:#ff7676;
+    --full:#4cc584; --full-bg:#1d3a2a; --half:#f0a83a; --half-bg:#3d2f17; --none-bg:#262b34;
+    --meal-on:#ff7676; --meal-on-bg:#4a2323;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:16px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:18px;margin:0;flex:1}
+main{max-width:1200px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-template-columns:minmax(0,1fr) 360px}
+@media (max-width:900px){main{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
+.panel h2{font-size:15px;margin:0 0 12px}
+.full-width{grid-column:1/-1}
+label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
+input,select,button{font:inherit;color:inherit}
+input[type=text],input[type=password],input[type=time],input[type=number],select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+button{padding:7px 12px;border-radius:6px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:disabled{opacity:.5;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.muted{color:var(--muted)} .small{font-size:12px}
+.status{font-size:13px;margin-top:8px}
+.status.err{color:var(--err)} .status.ok{color:var(--ok)}
+/* calendar */
+.calhead{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+.calhead h2{margin:0;flex:1;text-transform:capitalize}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.dow{font-size:11px;color:var(--muted);text-align:center;padding:2px 0}
+.cell{min-height:86px;border:1px solid var(--line);border-radius:8px;padding:5px;cursor:pointer;display:flex;flex-direction:column;gap:4px;background:var(--panel);user-select:none}
+.cell.out{opacity:.4}
+.cell.weekend .num{color:var(--err)}
+.cell.trip{background:var(--accent-weak);border-color:var(--accent)}
+.cell.pending{outline:2px dashed var(--accent);outline-offset:-2px}
+.cell.today .num{background:var(--text);color:var(--panel);border-radius:4px;padding:0 4px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:4px}
+.num{font-weight:600;font-size:13px}
+.badge{font-size:10px;font-weight:600;padding:1px 5px;border-radius:4px}
+.badge.full{background:var(--full-bg);color:var(--full)}
+.badge.half{background:var(--half-bg);color:var(--half)}
+.badge.none{background:var(--none-bg);color:var(--muted)}
+.time{font-size:10px;color:var(--muted)}
+.meals{display:flex;gap:3px;margin-top:auto}
+.meals button{flex:1;padding:2px 0;font-size:11px;font-weight:600;border-radius:4px;min-width:0}
+.meals button.on{background:var(--meal-on-bg);border-color:var(--meal-on);color:var(--meal-on);text-decoration:line-through}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:12px;color:var(--muted)}
+/* trips */
+.trip-card{border:1px solid var(--line);border-radius:8px;padding:10px;margin-bottom:10px}
+.trip-card.sel{border-color:var(--accent)}
+.trip-card .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.trip-card h3{font-size:13px;margin:0;flex:1}
+/* table */
+.tablewrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase}
+td.num-r,th.num-r{text-align:right}
+tr.ded td{color:var(--err)}
+tr.excluded td{opacity:.45}
+.st-ok{color:var(--ok)} .st-err{color:var(--err)} .st-dup{color:var(--warn)}
+.totals{display:flex;gap:20px;flex-wrap:wrap;margin:12px 0;font-size:13px}
+.totals b{font-size:15px}
+details summary{cursor:pointer;font-weight:600}
+.map{display:grid;grid-template-columns:1fr 90px;gap:6px;align-items:end}
+</style>
+</head>
+<body>
+<header>
+  <h1>Traktamente → Timekeeper</h1>
+  <span id="who" class="muted small">Inte inloggad</span>
+</header>
+
+<main>
+  <!-- Anslutning -->
+  <section class="panel full-width" id="loginPanel">
+    <h2>Anslutning till Timekeeper</h2>
+    <div class="row" style="align-items:end">
+      <div style="flex:1;min-width:180px"><label for="user">Användarnamn</label><input id="user" type="text" autocomplete="username"></div>
+      <div style="flex:1;min-width:180px"><label for="pass">Lösenord</label><input id="pass" type="password" autocomplete="current-password"></div>
+      <button class="primary" id="btnLogin">Logga in</button>
+      <button id="btnDemo">Prova i demoläge</button>
+    </div>
+    <div class="small muted" style="margin-top:6px">Lösenordet sparas inte. Det skickas bara till api2.timekeeper.se (Basic Auth).</div>
+    <div id="loginStatus" class="status"></div>
+  </section>
+
+  <!-- Kalender -->
+  <section class="panel">
+    <div class="calhead">
+      <button id="prev" aria-label="Föregående månad">‹</button>
+      <h2 id="monthTitle"></h2>
+      <button id="next" aria-label="Nästa månad">›</button>
+    </div>
+    <div class="grid" id="cal"></div>
+    <div id="calMsg" class="status err"></div>
+    <div class="legend">
+      <span>Klicka på första och sista resdagen för att lägga till en resa.</span>
+      <span><b>F L M</b> = frukost, lunch, middag som ingått (ger kostavdrag)</span>
+      <span>Esc avbryter markering</span>
+    </div>
+  </section>
+
+  <!-- Resor + inställningar -->
+  <aside>
+    <section class="panel" style="margin-bottom:16px">
+      <h2>Resor</h2>
+      <div id="trips"><p class="muted small">Inga resor än.</p></div>
+    </section>
+    <section class="panel">
+      <details id="settings">
+        <summary>Inställningar (lönearter och belopp)</summary>
+        <p class="small muted">Lönearterna är förvalda för företaget och behöver normalt inte ändras. Beloppen hämtas från Timekeeper.</p>
+        <div id="mapping"></div>
+        <label class="row" style="color:var(--text);font-size:13px;margin-top:10px">
+          <input type="checkbox" id="halveOnHalf" style="width:auto"> Halvera måltidsavdrag på halvdagar
+        </label>
+        <label for="defProject">Standardprojekt för nya resor</label>
+        <select id="defProject"></select>
+      </details>
+    </section>
+  </aside>
+
+  <!-- Rader -->
+  <section class="panel full-width">
+    <div class="row"><h2 style="flex:1;margin:0">Rader som skapas i Timekeeper</h2>
+      <button id="btnCheck">Kolla dubbletter</button>
+      <button id="btnCancel" hidden>Avbryt</button>
+      <button class="primary" id="btnSend">Skicka</button>
+    </div>
+    <div class="totals" id="totals"></div>
+    <div class="tablewrap"><table id="rows"></table></div>
+    <div id="sendStatus" class="status"></div>
+  </section>
+</main>
+<footer class="small muted" style="max-width:1200px;margin:0 auto;padding:0 16px 24px">
+  Hel dag om avresa före 12.00 eller hemkomst efter 19.00, annars halvdag. Endagsresor ger inget traktamente.
+  Raderna skapas som utlägg i Timekeeper och attesteras som vanligt. Frågor? Kontakta <span id="supportContact"></span>.
+</footer>
+
+<script>
+// ================= KONFIGURATION =================
+const API = 'https://api2.timekeeper.se/api/v1';
+// Företagets lönearter i Timekeeper (ID). Används automatiskt för alla anställda.
+// Belopp hämtas alltid från lönearten i Timekeeper – ändra beloppen där, inte här.
+const DEFAULT_WAGE_CODES = {
+  full:      11050, // Inrikes helt traktamente - skattefri
+  half:      12556, // Inrikes halvt traktamente - skattefri
+  breakfast: 12543, // Inrikes - måltidsreduktion frukost
+  lunch:     12544, // Inrikes - måltidsreduktion lunch
+  dinner:    12545, // Inrikes - måltidsreduktion middag
+};
+// Visas i sidfoten och i felmeddelanden.
+const SUPPORT_CONTACT = 'ekonomiavdelningen';
+// =================================================
+const ROLES = [
+  {key:'full',      label:'Heldagstraktamente', match:n=>/trakt/i.test(n)&&/hel/i.test(n)},
+  {key:'half',      label:'Halvdagstraktamente',match:n=>/trakt/i.test(n)&&/halv/i.test(n)},
+  {key:'breakfast', label:'Avdrag frukost',     match:n=>/frukost/i.test(n), ded:true},
+  {key:'lunch',     label:'Avdrag lunch',       match:n=>/lunch/i.test(n),   ded:true},
+  {key:'dinner',    label:'Avdrag middag',      match:n=>/middag/i.test(n),  ded:true},
+];
+const MEALS = [['b','F','breakfast','frukost'],['l','L','lunch','lunch'],['d','M','dinner','middag']];
+
+// ---------- state ----------
+const S = {
+  auth:null, demo:false, me:null, wageCodes:[], projects:[],
+  cfg:{roles:{}, halveOnHalf:true, projectId:null},
+  trips:[], meals:{}, month:null, pending:null, selTrip:null,
+  existing:[], status:{}, excluded:new Set(),
+};
+const store = {
+  get(k,d){try{const v=localStorage.getItem('tk-trakt-'+k);return v?JSON.parse(v):d}catch(e){return d}},
+  set(k,v){try{localStorage.setItem('tk-trakt-'+k,JSON.stringify(v))}catch(e){}}
+};
+function save(){store.set('cfg',S.cfg);store.set('trips',S.trips);store.set('meals',S.meals)}
+
+// ---------- dates ----------
+const P = s => new Date(s+'T00:00:00Z');
+const iso = d => d.toISOString().slice(0,10);
+const addDays = (s,n) => iso(new Date(P(s).getTime()+n*864e5));
+const todayISO = iso(new Date(Date.UTC(new Date().getFullYear(),new Date().getMonth(),new Date().getDate())));
+const fmtShort = s => P(s).toLocaleDateString('sv-SE',{day:'numeric',month:'short',timeZone:'UTC'});
+const fmtDow = s => P(s).toLocaleDateString('sv-SE',{weekday:'short',timeZone:'UTC'});
+function eachDay(a,b){const out=[];for(let d=a;d<=b;d=addDays(d,1))out.push(d);return out}
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const kr = n => n.toLocaleString('sv-SE',{minimumFractionDigits:0,maximumFractionDigits:2})+' kr';
+
+// ---------- rule engine ----------
+// Skatteverkets regler: avresedag hel dag om avresa före 12.00, hemresedag hel dag om hemkomst efter 19.00.
+// Endagsresa (ingen övernattning) ger inget traktamente.
+function dayType(trip, d){
+  if(trip.start===trip.end) return 'none';
+  if(d===trip.start) return trip.depart < '12:00' ? 'full' : 'half';
+  if(d===trip.end)   return trip.ret > '19:00' ? 'full' : 'half';
+  return 'full';
+}
+function tripFor(d){return S.trips.find(t=>d>=t.start&&d<=t.end)}
+
+function buildRows(){
+  const rows=[];
+  const wc = id => S.wageCodes.find(w=>w.id==id);
+  for(const t of [...S.trips].sort((a,b)=>a.start.localeCompare(b.start))){
+    for(const d of eachDay(t.start,t.end)){
+      const type=dayType(t,d);
+      if(type==='none') continue;
+      const r=S.cfg.roles[type]||{};
+      let comment=[];
+      if(d===t.start) comment.push('Avresa '+t.depart);
+      if(d===t.end) comment.push('Hemkomst '+t.ret);
+      if(t.note) comment.push(t.note);
+      rows.push({date:d,role:type,wageCodeID:r.id,name:wc(r.id)?.name||ROLES.find(x=>x.key===type).label,
+        quantity:1,price:+r.price||0,ded:false,projectID:t.projectId,comment:comment.join(', ')});
+      const m=S.meals[d]||{};
+      const merged={};
+      for(const [k,,role,word] of MEALS){
+        if(!m[k]) continue;
+        const rr=S.cfg.roles[role]||{};
+        const price=(+rr.price||0)*(type==='half'&&S.cfg.halveOnHalf?0.5:1);
+        const key=(rr.id??role)+'|'+price;
+        if(merged[key]){merged[key].quantity++;merged[key].words.push(word);continue}
+        merged[key]={date:d,role,wageCodeID:rr.id,name:wc(rr.id)?.name||ROLES.find(x=>x.key===role).label,
+          quantity:1,price,ded:true,projectID:t.projectId,words:[word]};
+      }
+      for(const x of Object.values(merged)){x.comment='Kostavdrag '+x.words.join(' + ')+(type==='half'?' (halvdag)':'');delete x.words;rows.push(x)}
+    }
+  }
+  rows.forEach(r=>r.key=[r.date,r.role,r.wageCodeID,r.price,r.quantity].join('|'));
+  return rows;
+}
+
+// ---------- API ----------
+async function api(path, opts={}){
+  if(S.demo) throw new Error('Demoläge');
+  const res = await fetch(API+path,{...opts,headers:{'Authorization':S.auth,'Content-Type':'application/json','Accept':'application/json',...(opts.headers||{})}});
+  const txt = await res.text(); let body=null; try{body=txt?JSON.parse(txt):null}catch(e){body=txt}
+  // Timekeeper svarar 404 på GET-listor som är tomma
+  if(res.status===404 && (opts.method||'GET')==='GET') return {results:[]};
+  if(!res.ok){
+    const msg = body?.messages?.join('; ') || body?.title || (typeof body==='string'&&body) || res.statusText;
+    throw new Error(res.status+' '+msg);
+  }
+  return body;
+}
+async function login(){
+  const u=$('#user').value.trim(), p=$('#pass').value;
+  const st=$('#loginStatus'); st.className='status'; st.textContent='Loggar in…';
+  S.auth='Basic '+btoa(unescape(encodeURIComponent(u+':'+p))); S.demo=false;
+  try{
+    const me = await api('/Login/me');
+    const m = me?.results?.[0] || me?.user || me?.result || me;
+    S.me = {id: m?.id ?? m?.userID ?? m?.userId, name: [m?.firstName,m?.lastName].filter(Boolean).join(' ') || m?.name || m?.email || u};
+    if(S.me.id==null) throw new Error('Kunde inte läsa ut ditt användar-ID från Timekeeper (/Login/me).');
+    const [wc,pr] = await Promise.all([
+      api('/WageCode?IsActive=true&PageSize=500'+(S.me.id?'&UserID='+S.me.id:'')),
+      api('/Project?PageSize=1000'),
+    ]);
+    S.wageCodes = wc?.results||[]; S.projects = pr?.results||[];
+    $('#pass').value='';
+    st.className='status ok'; st.textContent=`Inloggad. ${S.wageCodes.length} lönearter och ${S.projects.length} projekt hämtade.`;
+    afterLoad();
+    checkExisting();
+  }catch(e){
+    S.auth=null; st.className='status err';
+    if(/^401/.test(e.message)) st.textContent='Inloggningen misslyckades: fel användarnamn eller lösenord, eller saknar ditt konto API-åtkomst. Prova att logga in i Timekeeper som vanligt och kontakta '+SUPPORT_CONTACT+' om det fungerar där men inte här.';
+    else if(/Failed to fetch|NetworkError/i.test(e.message)) st.textContent='Kunde inte nå Timekeeper. Kontrollera nätverket eller om något webbläsartillägg blockerar anropet.';
+    else st.textContent='Inloggningen misslyckades: '+e.message;
+  }
+}
+function demo(){
+  S.demo=true; S.auth=null; S.me={id:0,name:'Demo-användare'};
+  S.wageCodes=[
+    {id:901,name:'Traktamente heldag (demo)',code:'T1',defaultPricePerUnit:300,isDeduction:false},
+    {id:902,name:'Traktamente halvdag (demo)',code:'T2',defaultPricePerUnit:150,isDeduction:false},
+    {id:903,name:'Kostavdrag frukost (demo)',code:'K1',defaultPricePerUnit:60,isDeduction:true},
+    {id:904,name:'Kostavdrag lunch (demo)',code:'K2',defaultPricePerUnit:105,isDeduction:true},
+    {id:905,name:'Kostavdrag middag (demo)',code:'K3',defaultPricePerUnit:105,isDeduction:true},
+  ];
+  S.projects=[{id:1,projectNr:'1001',projectName:'Kund A – installation'},{id:2,projectNr:'1002',projectName:'Kund B – service'}];
+  const st=$('#loginStatus'); st.className='status ok'; st.textContent='Demoläge: påhittade lönearter och projekt. Inget skickas till Timekeeper.';
+  afterLoad();
+}
+function afterLoad(){
+  $('#who').textContent = (S.demo?'Demoläge · ':'Inloggad som ')+S.me.name;
+  // Koppla lönearter: egen inställning → företagets standard → namnmatchning.
+  // Beloppet hämtas alltid från Timekeeper så att ändrade belopp slår igenom direkt.
+  for(const r of ROLES){
+    const byId=id=>S.wageCodes.find(w=>w.id==id);
+    const w = (!S.demo && byId(S.cfg.roles[r.key]?.id)) || (!S.demo && byId(DEFAULT_WAGE_CODES[r.key]))
+           || byId(S.cfg.roles[r.key]?.id) || S.wageCodes.find(w=>r.match(w.name||''));
+    S.cfg.roles[r.key]= w?{id:w.id,price:w.defaultPricePerUnit}:{id:null,price:0};
+  }
+  if(!S.projects.some(p=>p.id==S.cfg.projectId)) S.cfg.projectId=S.projects[0]?.id??null;
+  S.trips.forEach(t=>{ if(!S.projects.some(p=>p.id==t.projectId)) t.projectId=S.cfg.projectId; });
+  if(ROLES.some(r=>!S.cfg.roles[r.key].id)) $('#settings').open=true;
+  save(); renderAll();
+}
+async function checkExisting(){
+  const rows=buildRows(); if(!rows.length||S.demo||!S.auth) return;
+  const from=rows[0].date, to=rows.reduce((m,r)=>r.date>m?r.date:m,from);
+  try{
+    const r=await api(`/ExpenseRegistration?UserID=${S.me.id}&FromDate=${from}&ToDate=${to}T23:59:59&PageSize=1000`);
+    S.existing=r?.results||[];
+    for(const row of rows){ if(isDup(row) && !S.status[row.key]) S.excluded.add(row.key); }
+    $('#sendStatus').className='status'; $('#sendStatus').textContent=`${S.existing.length} befintliga utlägg hittades i perioden ${from} – ${to}.`;
+  }catch(e){ $('#sendStatus').className='status err'; $('#sendStatus').textContent='Kunde inte hämta befintliga utlägg: '+e.message; }
+  renderRows();
+}
+const isDup = row => S.existing.some(e=>String(e.date).slice(0,10)===row.date && e.wageCodeID==row.wageCodeID);
+
+async function send(){
+  const rows=buildRows().filter(r=>!S.excluded.has(r.key)&&S.status[r.key]?.s!=='ok');
+  const problems=[];
+  if(!S.me) problems.push('Logga in först.');
+  if(rows.some(r=>!r.wageCodeID)) problems.push('Alla rader måste ha en löneart (se Inställningar).');
+  if(rows.some(r=>!r.projectID)) problems.push('Alla resor måste ha ett projekt.');
+  if(!rows.length) problems.push('Inga rader att skicka.');
+  const st=$('#sendStatus');
+  if(problems.length){st.className='status err';st.textContent=problems.join(' ');return}
+  // Tvåstegsbekräftelse i sidan (confirm() blockeras i vissa webbläsare)
+  if(!S.confirmSend){
+    S.confirmSend=true; renderRows();
+    st.className='status'; st.textContent=`Klicka igen för att skapa ${rows.length} rader i Timekeeper${S.demo?' (demoläge, inget skickas på riktigt)':''}.`;
+    return;
+  }
+  S.confirmSend=false; $('#btnCancel').hidden=true;
+  $('#btnSend').disabled=true; let ok=0, fail=0;
+  for(const r of rows){
+    S.status[r.key]={s:'busy'}; renderRows();
+    try{
+      if(S.demo){ await new Promise(res=>setTimeout(res,150)); }
+      else await api('/ExpenseRegistration',{method:'POST',body:JSON.stringify({
+        userID:S.me.id, date:r.date, wageCodeID:r.wageCodeID, projectID:r.projectID,
+        quantity:r.quantity, price:r.price, comment:r.comment})});
+      S.status[r.key]={s:'ok'}; ok++;
+    }catch(e){ S.status[r.key]={s:'err',msg:e.message}; fail++; }
+    renderRows();
+  }
+  $('#btnSend').disabled=false;
+  st.className='status '+(fail?'err':'ok');
+  st.textContent=`${ok} rader skapade${fail?`, ${fail} misslyckades (se statuskolumnen)`:''}.`;
+  if(!S.demo) checkExisting();
+}
+
+// ---------- rendering ----------
+const $ = s => document.querySelector(s);
+function renderAll(){renderCal();renderTrips();renderMapping();renderRows()}
+
+function renderCal(){
+  const [y,m]=S.month.split('-').map(Number);
+  const first=`${S.month}-01`, last=iso(new Date(Date.UTC(y,m,0)));
+  $('#monthTitle').textContent=P(first).toLocaleDateString('sv-SE',{month:'long',year:'numeric',timeZone:'UTC'});
+  const startOff=(P(first).getUTCDay()+6)%7, endOff=(7-P(last).getUTCDay())%7;
+  let h=['mån','tis','ons','tor','fre','lör','sön'].map(d=>`<div class="dow">${d}</div>`).join('');
+  for(const d of eachDay(addDays(first,-startOff),addDays(last,endOff))){
+    const t=tripFor(d), wd=P(d).getUTCDay();
+    const cls=['cell']; if(d<first||d>last)cls.push('out'); if(wd===0||wd===6)cls.push('weekend');
+    if(t)cls.push('trip'); if(S.pending===d)cls.push('pending'); if(d===todayISO)cls.push('today');
+    let inner=`<div class="top"><span class="num">${+d.slice(8)}</span>`;
+    if(t){const ty=dayType(t,d);inner+=`<span class="badge ${ty}">${{full:'Hel',half:'Halv',none:'Ingen'}[ty]}</span>`}
+    inner+='</div>';
+    if(t){
+      if(d===t.start) inner+=`<span class="time">↗ ${t.depart}</span>`;
+      if(d===t.end) inner+=`<span class="time">↘ ${t.ret}</span>`;
+      if(dayType(t,d)!=='none'){
+        const ml=S.meals[d]||{};
+        inner+='<div class="meals">'+MEALS.map(([k,l,,w])=>`<button data-meal="${k}" data-date="${d}" class="${ml[k]?'on':''}" title="${w} ingick">${l}</button>`).join('')+'</div>';
+      }
+    }
+    h+=`<div class="${cls.join(' ')}" data-date="${d}">${inner}</div>`;
+  }
+  $('#cal').innerHTML=h;
+}
+
+function projOptions(sel){
+  if(!S.projects.length) return '<option value="">Logga in för att hämta projekt</option>';
+  return S.projects.map(p=>`<option value="${p.id}" ${p.id==sel?'selected':''}>${esc([p.projectNr,p.projectName].filter(Boolean).join(' – '))}</option>`).join('');
+}
+function renderTrips(){
+  const el=$('#trips');
+  if(!S.trips.length){el.innerHTML='<p class="muted small">Inga resor än. Klicka på första och sista dagen i kalendern.</p>';return}
+  el.innerHTML=[...S.trips].sort((a,b)=>a.start.localeCompare(b.start)).map(t=>{
+    const days=eachDay(t.start,t.end).map(d=>dayType(t,d));
+    const nf=days.filter(x=>x==='full').length, nh=days.filter(x=>x==='half').length;
+    return `<div class="trip-card ${S.selTrip===t.id?'sel':''}" data-trip="${t.id}">
+      <div class="row"><h3>${fmtShort(t.start)} – ${fmtShort(t.end)}</h3><button data-del="${t.id}" title="Ta bort resan">✕</button></div>
+      <div class="small muted">${t.start===t.end?'Endagsresa – ger inget traktamente':`${nf} hel, ${nh} halv`}</div>
+      <div class="two">
+        <div><label>Avresa ${fmtDow(t.start)}</label><input type="time" data-f="depart" value="${t.depart}"></div>
+        <div><label>Hemkomst ${fmtDow(t.end)}</label><input type="time" data-f="ret" value="${t.ret}"></div>
+      </div>
+      <label>Projekt</label><select data-f="projectId">${projOptions(t.projectId)}</select>
+      <label>Ort / ändamål (hamnar i kommentaren)</label><input type="text" data-f="note" value="${esc(t.note)}" placeholder="t.ex. Göteborg, kundbesök">
+    </div>`}).join('');
+}
+
+function renderMapping(){
+  const opts=sel=>'<option value="">– välj –</option>'+S.wageCodes.map(w=>`<option value="${w.id}" ${w.id==sel?'selected':''}>${esc((w.code?w.code+' ':'')+w.name)}${w.isDeduction?' (avdrag)':''}</option>`).join('');
+  $('#mapping').innerHTML = S.wageCodes.length ? ROLES.map(r=>{const c=S.cfg.roles[r.key]||{};return `
+    <label>${r.label}</label>
+    <div class="map"><select data-role="${r.key}">${opts(c.id)}</select>
+    <span class="small muted" style="text-align:right;padding-bottom:7px" title="Belopp från Timekeeper">${kr(+c.price||0)}</span></div>`}).join('')
+    : '<p class="small muted">Logga in (eller välj demoläge) för att hämta lönearter.</p>';
+  $('#halveOnHalf').checked=S.cfg.halveOnHalf;
+  $('#defProject').innerHTML=projOptions(S.cfg.projectId);
+}
+
+function renderRows(){
+  const rows=buildRows();
+  const pname=id=>{const p=S.projects.find(p=>p.id==id);return p?(p.projectNr||p.projectName):'–'};
+  if(!rows.length){$('#rows').innerHTML='<tr><td class="muted">Lägg till en resa i kalendern så visas raderna här.</td></tr>';$('#totals').innerHTML='';$('#btnSend').disabled=true;return}
+  let plus=0,minus=0;
+  const body=rows.map(r=>{
+    const inc=!S.excluded.has(r.key), sum=r.quantity*r.price;
+    if(inc){r.ded?minus+=sum:plus+=sum}
+    const st=S.status[r.key]; let stTxt='';
+    if(st?.s==='ok') stTxt='<span class="st-ok">✓ Skapad</span>';
+    else if(st?.s==='err') stTxt=`<span class="st-err" title="${esc(st.msg)}">✗ ${esc(st.msg).slice(0,60)}</span>`;
+    else if(st?.s==='busy') stTxt='<span class="muted">Skickar…</span>';
+    else if(isDup(r)) stTxt='<span class="st-dup">⚠ Finns redan samma dag</span>';
+    else if(!r.wageCodeID) stTxt='<span class="st-err">Löneart saknas</span>';
+    return `<tr class="${r.ded?'ded':''} ${inc?'':'excluded'}">
+      <td><input type="checkbox" data-inc="${esc(r.key)}" ${inc?'checked':''} ${st?.s==='ok'?'disabled':''}></td>
+      <td>${r.date} <span class="muted">${fmtDow(r.date)}</span></td><td>${esc(r.name)}</td>
+      <td class="num-r">${r.quantity}</td><td class="num-r">${kr(r.price)}</td><td class="num-r">${r.ded?'−':''}${kr(sum)}</td>
+      <td>${esc(pname(r.projectID))}</td><td>${esc(r.comment)}</td><td>${stTxt}</td></tr>`}).join('');
+  $('#rows').innerHTML=`<thead><tr><th></th><th>Datum</th><th>Löneart</th><th class="num-r">Antal</th><th class="num-r">À-pris</th><th class="num-r">Summa</th><th>Projekt</th><th>Kommentar</th><th>Status</th></tr></thead><tbody>${body}</tbody>`;
+  const n=rows.filter(r=>!S.excluded.has(r.key)&&S.status[r.key]?.s!=='ok').length;
+  $('#totals').innerHTML=`<span>Traktamente <b>${kr(plus)}</b></span><span>Kostavdrag <b style="color:var(--err)">−${kr(minus)}</b></span><span>Netto <b>${kr(plus-minus)}</b></span><span class="muted">${n} rader att skicka</span>`;
+  $('#btnSend').disabled=!n;
+  $('#btnSend').textContent= S.confirmSend ? `Bekräfta: skapa ${n} rader` : `Skicka ${n} rader`;
+  $('#btnCancel').hidden=!S.confirmSend;
+}
+
+// ---------- events ----------
+$('#btnLogin').onclick=login;
+$('#pass').addEventListener('keydown',e=>{if(e.key==='Enter')login()});
+$('#btnDemo').onclick=demo;
+$('#btnSend').onclick=send;
+$('#btnCancel').onclick=()=>{S.confirmSend=false;$('#sendStatus').textContent='';renderRows()};
+$('#btnCheck').onclick=()=>{ if(S.demo){$('#sendStatus').textContent='Dubblettkontroll kräver inloggning.';return} checkExisting(); };
+$('#prev').onclick=()=>{const [y,m]=S.month.split('-').map(Number);S.month=iso(new Date(Date.UTC(y,m-2,1))).slice(0,7);renderCal()};
+$('#next').onclick=()=>{const [y,m]=S.month.split('-').map(Number);S.month=iso(new Date(Date.UTC(y,m,1))).slice(0,7);renderCal()};
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.pending){S.pending=null;renderCal()}});
+
+$('#cal').addEventListener('click',e=>{
+  const mb=e.target.closest('[data-meal]');
+  if(mb){const d=mb.dataset.date,k=mb.dataset.meal;S.meals[d]={...(S.meals[d]||{}),[k]:!(S.meals[d]||{})[k]};save();renderCal();renderRows();return}
+  const cell=e.target.closest('.cell'); if(!cell) return;
+  const d=cell.dataset.date, t=tripFor(d);
+  if(t&&!S.pending){S.selTrip=t.id;renderTrips();document.querySelector(`[data-trip="${t.id}"]`)?.scrollIntoView({block:'nearest',behavior:'smooth'});return}
+  if(!S.pending){S.pending=d;renderCal();return}
+  let a=S.pending,b=d; if(b<a)[a,b]=[b,a];
+  if(S.trips.some(t=>!(b<t.start||a>t.end))){$('#calMsg').textContent='Resan överlappar en befintlig resa.';S.pending=null;renderCal();return}
+  $('#calMsg').textContent='';
+  const trip={id:Date.now().toString(36),start:a,end:b,depart:'08:00',ret:'17:00',projectId:S.cfg.projectId,note:''};
+  S.trips.push(trip);S.selTrip=trip.id;S.pending=null;save();renderAll();checkExisting();
+});
+$('#trips').addEventListener('click',e=>{
+  const del=e.target.closest('[data-del]'); if(!del) return;
+  const t=S.trips.find(t=>t.id===del.dataset.del);
+  if(!del.classList.contains('armed')){del.classList.add('armed');del.textContent='Ta bort?';return}
+  eachDay(t.start,t.end).forEach(d=>delete S.meals[d]);
+  S.trips=S.trips.filter(x=>x!==t);save();renderAll();
+});
+$('#trips').addEventListener('change',e=>{
+  const f=e.target.dataset.f; if(!f) return;
+  const t=S.trips.find(t=>t.id===e.target.closest('[data-trip]').dataset.trip);
+  t[f]= f==='projectId' ? +e.target.value : e.target.value;
+  save();renderCal();renderTrips();renderRows();
+});
+$('#mapping').addEventListener('change',e=>{
+  const role=e.target.dataset.role;
+  if(role){const w=S.wageCodes.find(w=>w.id==e.target.value);S.cfg.roles[role]={id:w?.id??null,price:w?.defaultPricePerUnit??0};renderMapping()}
+  save();renderRows();
+});
+$('#halveOnHalf').onchange=e=>{S.cfg.halveOnHalf=e.target.checked;save();renderRows()};
+$('#defProject').onchange=e=>{S.cfg.projectId=+e.target.value;save()};
+$('#rows').addEventListener('change',e=>{
+  const k=e.target.dataset.inc; if(k==null) return;
+  e.target.checked?S.excluded.delete(k):S.excluded.add(k);renderRows();
+});
+
+// ---------- init ----------
+S.cfg={...S.cfg,...store.get('cfg',{})}; S.trips=store.get('trips',[]); S.meals=store.get('meals',{});
+S.month=todayISO.slice(0,7);
+$('#supportContact').textContent=SUPPORT_CONTACT;
+renderAll();
+</script>
+</body>
+</html>
