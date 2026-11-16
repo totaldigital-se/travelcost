@@ -36,9 +36,11 @@ Sidan hanterar **inte**: nattraktamente, utlandstraktamente, sänkt traktamente 
 const DEFAULT_WAGE_CODES = { full: 11050, half: 12556, breakfast: 12543, lunch: 12544, dinner: 12545,
                              mileFuel: null, mileEl: null };
 const MILEAGE_RATES = { mileFuel: 45, mileEl: 34 };   // kr/mil inkl. tillägg
+const DEFAULT_PROJECT_NR = '998';                     // Internt (Total Digital)
 const SUPPORT_CONTACT = 'ekonomiavdelningen';
 ```
 
+- `DEFAULT_PROJECT_NR` är projektnumret som nya resor och körningar får som standard. Den som vill kan välja ett eget standardprojekt under *Inställningar*.
 - `MILEAGE_RATES` innehåller företagets milersättning per mil inklusive tillägget. Den ersätter lönearternas standardbelopp i Timekeeper.
 
 - `DEFAULT_WAGE_CODES` innehåller ID:n för företagets lönearter i Timekeeper. Alla anställda får dem automatiskt. Den som vill kan byta löneart under *Inställningar*. Valet sparas då i den egna webbläsaren. Står det `null` letar sidan upp lönearten via namnet. För milersättning letar den efter "Milersättning" + "bensin/diesel" eller "el bil".

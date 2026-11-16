@@ -202,6 +202,8 @@ const MILEAGE_RATES = {
   mileFuel: 45, // bensin/diesel
   mileEl:   34, // elbil
 };
+// Standardprojekt för nya resor och körningar (projektnummer i Timekeeper).
+const DEFAULT_PROJECT_NR = '998'; // Internt (Total Digital)
 // Visas i sidfoten och i felmeddelanden.
 const SUPPORT_CONTACT = 'ekonomiavdelningen';
 // =================================================
@@ -344,7 +346,7 @@ function demo(){
     {id:906,name:'Milersättning bensin, diesel bil (demo)',code:'M1',defaultPricePerUnit:25,isDeduction:false},
     {id:907,name:'Milersättning el bil (demo)',code:'M2',defaultPricePerUnit:9.5,isDeduction:false},
   ];
-  S.projects=[{id:1,projectNr:'1001',projectName:'Kund A – installation'},{id:2,projectNr:'1002',projectName:'Kund B – service'}];
+  S.projects=[{id:3,projectNr:'998',projectName:'Internt (demo)'},{id:1,projectNr:'1001',projectName:'Kund A – installation'},{id:2,projectNr:'1002',projectName:'Kund B – service'}];
   const st=$('#loginStatus'); st.className='status ok'; st.textContent='Demoläge: påhittade lönearter och projekt. Inget skickas till Timekeeper.';
   afterLoad();
 }
@@ -358,7 +360,10 @@ function afterLoad(){
            || byId(S.cfg.roles[r.key]?.id) || S.wageCodes.find(w=>r.match(w.name||''));
     S.cfg.roles[r.key]= w?{id:w.id,price:MILEAGE_RATES[r.key]??w.defaultPricePerUnit}:{id:null,price:MILEAGE_RATES[r.key]??0};
   }
-  if(!S.projects.some(p=>p.id==S.cfg.projectId)) S.cfg.projectId=S.projects[0]?.id??null;
+  // Standardprojekt: eget val om man gjort ett, annars företagets standard (998 Internt)
+  const defProj=S.projects.find(p=>String(p.projectNr).trim()===DEFAULT_PROJECT_NR);
+  if(!S.cfg.projectUserSet || !S.projects.some(p=>p.id==S.cfg.projectId))
+    S.cfg.projectId=(defProj||S.projects[0])?.id??null;
   [...S.trips,...S.mileage].forEach(t=>{ if(!S.projects.some(p=>p.id==t.projectId)) t.projectId=S.cfg.projectId; });
   if(ROLES.some(r=>!S.cfg.roles[r.key].id)) $('#settings').open=true;
   save(); renderAll();
@@ -583,7 +588,7 @@ $('#mileage').addEventListener('click',e=>{
   S.mileage=S.mileage.filter(m=>m.id!==del.dataset.mdel);save();renderMileage();renderRows();
 });
 $('#halveOnHalf').onchange=e=>{S.cfg.halveOnHalf=e.target.checked;save();renderRows()};
-$('#defProject').onchange=e=>{S.cfg.projectId=+e.target.value;save()};
+$('#defProject').onchange=e=>{S.cfg.projectId=+e.target.value;S.cfg.projectUserSet=true;save()};
 $('#rows').addEventListener('change',e=>{
   const k=e.target.dataset.inc; if(k==null) return;
   e.target.checked?S.excluded.delete(k):S.excluded.add(k);renderRows();
