@@ -146,7 +146,7 @@ details summary{cursor:pointer;font-weight:600}
     <section class="panel">
       <details id="settings">
         <summary>Inställningar (lönearter och belopp)</summary>
-        <p class="small muted">Lönearterna är förvalda för företaget och behöver normalt inte ändras. Beloppen hämtas från Timekeeper.</p>
+        <p class="small muted">Lönearterna är förvalda för företaget och behöver normalt inte ändras. Beloppen hämtas från Timekeeper, utom milersättning som följer företagets satser inkl. tillägg.</p>
         <div id="mapping"></div>
         <label class="row" style="color:var(--text);font-size:13px;margin-top:10px">
           <input type="checkbox" id="halveOnHalf" style="width:auto"> Halvera måltidsavdrag på halvdagar
@@ -162,7 +162,7 @@ details summary{cursor:pointer;font-weight:600}
     <div class="row"><h2 style="flex:1;margin:0">Milersättning</h2>
       <button id="btnAddMile">+ Lägg till körning</button>
     </div>
-    <p class="small muted" style="margin:6px 0 10px">Ange datum, biltyp och antal mil (1 mil = 10 km, decimaler går bra, t.ex. 12,5).</p>
+    <p class="small muted" style="margin:6px 0 10px" id="mileHelp"></p>
     <div id="mileage"></div>
   </section>
 
@@ -196,6 +196,11 @@ const DEFAULT_WAGE_CODES = {
   dinner:    12545, // Inrikes - måltidsreduktion middag
   mileFuel:  null,  // Milersättning bensin, diesel bil (null = hittas via namnet)
   mileEl:    null,  // Milersättning el bil (null = hittas via namnet)
+};
+// Milersättning per mil inklusive företagets tillägg. Ersätter lönearternas standardbelopp.
+const MILEAGE_RATES = {
+  mileFuel: 45, // bensin/diesel
+  mileEl:   34, // elbil
 };
 // Visas i sidfoten och i felmeddelanden.
 const SUPPORT_CONTACT = 'ekonomiavdelningen';
@@ -233,7 +238,8 @@ const fmtShort = s => P(s).toLocaleDateString('sv-SE',{day:'numeric',month:'shor
 const fmtDow = s => P(s).toLocaleDateString('sv-SE',{weekday:'short',timeZone:'UTC'});
 function eachDay(a,b){const out=[];for(let d=a;d<=b;d=addDays(d,1))out.push(d);return out}
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const kr = n => n.toLocaleString('sv-SE',{minimumFractionDigits:0,maximumFractionDigits:2})+' kr';
+const num = n => n.toLocaleString('sv-SE',{minimumFractionDigits:0,maximumFractionDigits:2});
+const kr = n => num(n)+' kr';
 
 // ---------- rule engine ----------
 // Skatteverkets regler: avresedag hel dag om avresa före 12.00, hemresedag hel dag om hemkomst efter 19.00.
@@ -279,9 +285,10 @@ function buildRows(){
   for(const m of S.mileage){
     const q=parseQty(m.quantity);
     if(!m.date||!(q>0)) continue;
-    const rr=S.cfg.roles[m.type]||{};
+    const rr=S.cfg.roles[m.type]||{}, rate=MILEAGE_RATES[m.type]??(+rr.price||0);
     rows.push({date:m.date,role:m.type,wageCodeID:rr.id,name:wc(rr.id)?.name||ROLES.find(x=>x.key===m.type).label,
-      quantity:q,price:+rr.price||0,ded:false,mile:true,projectID:m.projectId,comment:m.note||'Milersättning',uid:m.id});
+      quantity:q,price:rate,ded:false,mile:true,projectID:m.projectId,uid:m.id,
+      comment:(m.note?m.note+' – ':'')+`${num(q)} mil × ${num(rate)} kr/mil (inkl. tillägg)`});
   }
   rows.sort((a,b)=>a.date.localeCompare(b.date));
   rows.forEach(r=>r.key=[r.date,r.role,r.wageCodeID,r.price,r.quantity,r.uid||''].join('|'));
@@ -349,7 +356,7 @@ function afterLoad(){
     const byId=id=>S.wageCodes.find(w=>w.id==id);
     const w = (!S.demo && byId(S.cfg.roles[r.key]?.id)) || (!S.demo && byId(DEFAULT_WAGE_CODES[r.key]))
            || byId(S.cfg.roles[r.key]?.id) || S.wageCodes.find(w=>r.match(w.name||''));
-    S.cfg.roles[r.key]= w?{id:w.id,price:w.defaultPricePerUnit}:{id:null,price:0};
+    S.cfg.roles[r.key]= w?{id:w.id,price:MILEAGE_RATES[r.key]??w.defaultPricePerUnit}:{id:null,price:MILEAGE_RATES[r.key]??0};
   }
   if(!S.projects.some(p=>p.id==S.cfg.projectId)) S.cfg.projectId=S.projects[0]?.id??null;
   [...S.trips,...S.mileage].forEach(t=>{ if(!S.projects.some(p=>p.id==t.projectId)) t.projectId=S.cfg.projectId; });
@@ -409,17 +416,21 @@ function renderAll(){renderCal();renderTrips();renderMapping();renderMileage();r
 
 function renderMileage(){
   const el=$('#mileage');
+  $('#mileHelp').textContent=`Ange datum, biltyp och antal mil (1 mil = 10 km, decimaler går bra, t.ex. 12,5). `
+    +`Ersättning inkl. tillägg: bensin/diesel ${num(MILEAGE_RATES.mileFuel)} kr/mil, elbil ${num(MILEAGE_RATES.mileEl)} kr/mil.`;
   if(!S.mileage.length){el.innerHTML='<p class="small muted" style="margin:0">Inga körningar än.</p>';return}
   const typeName=k=>{const w=S.wageCodes.find(w=>w.id==S.cfg.roles[k]?.id);return w?.name||ROLES.find(r=>r.key===k).label};
   el.innerHTML=S.mileage.map(m=>{
-    const q=parseQty(m.quantity), price=+(S.cfg.roles[m.type]?.price)||0;
-    const sum = q>0 ? `${String(q).replace('.',',')} mil × ${kr(price)} = ${kr(q*price)}` : (m.quantity?'<span style="color:var(--err)">Ogiltigt antal</span>':'');
+    const q=parseQty(m.quantity), price=MILEAGE_RATES[m.type]??(+(S.cfg.roles[m.type]?.price)||0);
+    const sum = q>0 ? `${num(q)} mil × ${num(price)} kr/mil = ${kr(q*price)}`
+              : m.quantity ? '<span style="color:var(--err)">Ogiltigt antal</span>'
+              : `Ex: 10 mil × ${num(price)} kr/mil = ${kr(10*price)}`;
     return `<div class="mile-row" data-mile="${m.id}">
       <div><label>Datum</label><input type="date" data-mf="date" value="${m.date}"></div>
       <div><label>Ersättning</label><select data-mf="type">${['mileFuel','mileEl'].map(k=>`<option value="${k}" ${m.type===k?'selected':''}>${esc(typeName(k))}</option>`).join('')}</select></div>
       <div><label>Antal mil</label><input type="text" inputmode="decimal" data-mf="quantity" value="${esc(m.quantity)}" placeholder="0,0"><div class="sum">${sum}</div></div>
       <div><label>Projekt</label><select data-mf="projectId">${projOptions(m.projectId)}</select></div>
-      <div><label>Kommentar (t.ex. sträcka)</label><input type="text" data-mf="note" value="${esc(m.note)}" placeholder="Stockholm – Uppsala t/r"></div>
+      <div><label>Sträcka / ärende</label><input type="text" data-mf="note" value="${esc(m.note)}" placeholder="${m.type==='mileEl'?'t.ex. Kontoret – kund i Uppsala t/r':'t.ex. Stockholm – Västerås, kundmöte'}"></div>
       <div class="del"><button data-mdel="${m.id}" title="Ta bort körningen">✕</button></div>
     </div>`}).join('');
 }
@@ -549,7 +560,7 @@ $('#trips').addEventListener('change',e=>{
 });
 $('#mapping').addEventListener('change',e=>{
   const role=e.target.dataset.role;
-  if(role){const w=S.wageCodes.find(w=>w.id==e.target.value);S.cfg.roles[role]={id:w?.id??null,price:w?.defaultPricePerUnit??0};renderMapping()}
+  if(role){const w=S.wageCodes.find(w=>w.id==e.target.value);S.cfg.roles[role]={id:w?.id??null,price:MILEAGE_RATES[role]??w?.defaultPricePerUnit??0};renderMapping()}
   save();renderRows();
 });
 $('#btnAddMile').onclick=()=>{

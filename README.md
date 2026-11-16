@@ -22,7 +22,7 @@ I stället för att lägga in varje post för hand (hel- och halvdag, måltidsav
 | Dagar däremellan | Hel dag |
 | Endagsresa | Inget traktamente, eftersom resan saknar övernattning |
 | Måltidsavdrag | En rad per måltid med lönearten för respektive måltid. På halvdagar halveras avdraget (kan stängas av under Inställningar) |
-| Milersättning | En rad per körning: antal mil × beloppet för lönearten (bensin/diesel eller el) |
+| Milersättning | En rad per körning: antal mil × företagets sats inkl. tillägg, 45 kr/mil för bensin/diesel och 34 kr/mil för elbil (`MILEAGE_RATES`). Kommentaren visar sträckan och uträkningen |
 
 Beloppen hämtas alltid från lönearterna i Timekeeper. När Skatteverkets belopp ändras uppdaterar man lönearterna i Timekeeper. Sidan behöver inte ändras.
 
@@ -35,8 +35,11 @@ Sidan hanterar **inte**: nattraktamente, utlandstraktamente, sänkt traktamente 
 ```js
 const DEFAULT_WAGE_CODES = { full: 11050, half: 12556, breakfast: 12543, lunch: 12544, dinner: 12545,
                              mileFuel: null, mileEl: null };
+const MILEAGE_RATES = { mileFuel: 45, mileEl: 34 };   // kr/mil inkl. tillägg
 const SUPPORT_CONTACT = 'ekonomiavdelningen';
 ```
+
+- `MILEAGE_RATES` innehåller företagets milersättning per mil inklusive tillägget. Den ersätter lönearternas standardbelopp i Timekeeper.
 
 - `DEFAULT_WAGE_CODES` innehåller ID:n för företagets lönearter i Timekeeper. Alla anställda får dem automatiskt. Den som vill kan byta löneart under *Inställningar*. Valet sparas då i den egna webbläsaren. Står det `null` letar sidan upp lönearten via namnet. För milersättning letar den efter "Milersättning" + "bensin/diesel" eller "el bil".
 - `SUPPORT_CONTACT` visas i sidfoten och i felmeddelanden.
