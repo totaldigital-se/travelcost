@@ -4,35 +4,49 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Traktamente → Timekeeper</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
+/* Färger enligt totaldigital.se (ljust tema = sajtens light.css, mörkt = colors.css) */
 :root{
-  --bg:#f6f7f9; --panel:#fff; --text:#1d2330; --muted:#677084; --line:#e2e5eb;
-  --accent:#2f6fdf; --accent-weak:#e6efff; --ok:#1f8a4c; --warn:#b26b00; --err:#c43232;
-  --full:#1f8a4c; --full-bg:#e3f4ea; --half:#b26b00; --half-bg:#fdf0dc; --none-bg:#eef0f3;
-  --meal-on:#c43232; --meal-on-bg:#fde6e6;
+  --brand:#C63D02; --on-brand:#fff;
+  --bg:#FAF6F0; --panel:#fff; --surface-alt:#F0EAE2; --text:#211D19; --muted:#5C554D; --line:#E8E0D6;
+  --accent:#E64A0F; --accent-text:#BC3D00; --accent-weak:#FCEADF; --ok:#2E7D4F; --warn:#8F6400; --err:#B3261E;
+  --full:#2E7D4F; --full-bg:#E2F1E7; --half:#8F6400; --half-bg:#F6EBD3; --none-bg:#F0EAE2;
+  --meal-on:#B3261E; --meal-on-bg:#F9E1DE;
+  --shadow:0 1px 2px rgba(0,0,0,.07),0 4px 12px rgba(0,0,0,.07);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
-    --bg:#14171d; --panel:#1c2028; --text:#e6e9ef; --muted:#9aa3b5; --line:#2c323d;
-    --accent:#6c9cff; --accent-weak:#22314f; --ok:#4cc584; --warn:#f0a83a; --err:#ff7676;
-    --full:#4cc584; --full-bg:#1d3a2a; --half:#f0a83a; --half-bg:#3d2f17; --none-bg:#262b34;
-    --meal-on:#ff7676; --meal-on-bg:#4a2323;
+    --bg:#1B1A19; --panel:#262422; --surface-alt:#2E2A27; --text:#F4F1EE; --muted:#BDB8B2; --line:#403C38;
+    --accent:#FF6A3B; --accent-text:#FF6A3B; --accent-weak:#3A2820; --ok:#6FCF97; --warn:#E3A64B; --err:#FF8A80;
+    --full:#6FCF97; --full-bg:#1F3328; --half:#E3A64B; --half-bg:#3A2E1B; --none-bg:#2E2A27;
+    --meal-on:#FF8A80; --meal-on-bg:#4A2421;
+    --shadow:0 4px 6px rgba(0,0,0,.15);
   }
 }
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-header{padding:16px;border-bottom:1px solid var(--line);background:var(--panel);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
-header h1{font-size:18px;margin:0;flex:1}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.45 "Open Sans",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:16px;background:var(--brand);color:var(--on-brand);display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+header h1{font-size:18px;font-weight:700;margin:0;flex:1}
+header #who{color:var(--on-brand);opacity:.85}
+a{color:var(--accent-text)}
 main{max-width:1200px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-template-columns:minmax(0,1fr) 360px}
 @media (max-width:900px){main{grid-template-columns:minmax(0,1fr)}}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px}
-.panel h2{font-size:15px;margin:0 0 12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;box-shadow:var(--shadow)}
+.panel h2{font-size:15px;font-weight:700;margin:0 0 12px}
+.panel h2::after{content:"";display:block;width:30px;height:4px;background:var(--accent);margin-top:8px}
+.calhead h2::after,.row h2::after{display:none}
 .full-width{grid-column:1/-1}
 label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
 input,select,button{font:inherit;color:inherit}
 input[type=text],input[type=password],input[type=time],input[type=number],select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
 button{padding:7px 12px;border-radius:6px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
-button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:hover:not(:disabled){border-color:var(--accent);color:var(--accent-text)}
+button.primary{background:var(--brand);border-color:var(--brand);color:var(--on-brand);font-weight:600}
+button.primary:hover:not(:disabled){background:var(--accent-text);border-color:var(--accent-text);color:var(--on-brand)}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 button:disabled{opacity:.5;cursor:not-allowed}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .muted{color:var(--muted)} .small{font-size:12px}
