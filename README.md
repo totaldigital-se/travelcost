@@ -1,8 +1,8 @@
 # travelcost
 
-Traktamente → Timekeeper.
+Resekostnader → Timekeeper.
 
-En webbsida där man rapporterar traktamente i en kalendervy. Sidan gör om resan till rader som skapas som utlägg i Timekeeper via deras API.
+En webbsida där man rapporterar resekostnader, alltså traktamente och milersättning. Traktamentet fylls i i en kalendervy. Sidan gör om resan till rader som skapas som utlägg i Timekeeper via deras API.
 
 I stället för att lägga in varje post för hand (hel- och halvdag, måltidsavdrag, tider) gör man så här:
 
