@@ -41,7 +41,7 @@ main{max-width:1200px;margin:0 auto;padding:16px;display:grid;gap:16px;grid-temp
 .full-width{grid-column:1/-1}
 label{display:block;font-size:12px;color:var(--muted);margin:8px 0 3px}
 input,select,button{font:inherit;color:inherit}
-input[type=text],input[type=password],input[type=time],input[type=number],select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
+input[type=text],input[type=password],input[type=time],input[type=date],input[type=number],select{width:100%;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg)}
 button{padding:7px 12px;border-radius:6px;border:1px solid var(--line);background:var(--panel);cursor:pointer}
 button:hover:not(:disabled){border-color:var(--accent);color:var(--accent-text)}
 button.primary{background:var(--brand);border-color:var(--brand);color:var(--on-brand);font-weight:600}
@@ -79,6 +79,13 @@ button:disabled{opacity:.5;cursor:not-allowed}
 .trip-card.sel{border-color:var(--accent)}
 .trip-card .two{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .trip-card h3{font-size:13px;margin:0;flex:1}
+/* mileage */
+.mile-row{display:grid;grid-template-columns:150px 240px 190px minmax(0,1fr) minmax(0,1.2fr) auto;gap:8px;align-items:start;padding:8px 0;border-bottom:1px solid var(--line)}
+.mile-row:last-child{border-bottom:0}
+.mile-row label{margin-top:0}
+.mile-row .sum{font-size:11px;color:var(--muted);margin-top:3px;min-height:15px;white-space:nowrap}
+.mile-row .del{padding-top:19px}
+@media (max-width:900px){.mile-row{grid-template-columns:1fr 1fr}.mile-row .del{justify-self:start}}
 /* table */
 .tablewrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-size:13px}
@@ -150,6 +157,15 @@ details summary{cursor:pointer;font-weight:600}
     </section>
   </aside>
 
+  <!-- Milersättning -->
+  <section class="panel full-width">
+    <div class="row"><h2 style="flex:1;margin:0">Milersättning</h2>
+      <button id="btnAddMile">+ Lägg till körning</button>
+    </div>
+    <p class="small muted" style="margin:6px 0 10px">Ange datum, biltyp och antal mil (1 mil = 10 km, decimaler går bra, t.ex. 12,5).</p>
+    <div id="mileage"></div>
+  </section>
+
   <!-- Rader -->
   <section class="panel full-width">
     <div class="row"><h2 style="flex:1;margin:0">Rader som skapas i Timekeeper</h2>
@@ -178,6 +194,8 @@ const DEFAULT_WAGE_CODES = {
   breakfast: 12543, // Inrikes - måltidsreduktion frukost
   lunch:     12544, // Inrikes - måltidsreduktion lunch
   dinner:    12545, // Inrikes - måltidsreduktion middag
+  mileFuel:  null,  // Milersättning bensin, diesel bil (null = hittas via namnet)
+  mileEl:    null,  // Milersättning el bil (null = hittas via namnet)
 };
 // Visas i sidfoten och i felmeddelanden.
 const SUPPORT_CONTACT = 'ekonomiavdelningen';
@@ -188,6 +206,8 @@ const ROLES = [
   {key:'breakfast', label:'Avdrag frukost',     match:n=>/frukost/i.test(n), ded:true},
   {key:'lunch',     label:'Avdrag lunch',       match:n=>/lunch/i.test(n),   ded:true},
   {key:'dinner',    label:'Avdrag middag',      match:n=>/middag/i.test(n),  ded:true},
+  {key:'mileFuel',  label:'Milersättning bensin/diesel', match:n=>/milers/i.test(n)&&/bensin|diesel/i.test(n), mile:true},
+  {key:'mileEl',    label:'Milersättning elbil', match:n=>/milers/i.test(n)&&/\bel\s?bil/i.test(n), mile:true},
 ];
 const MEALS = [['b','F','breakfast','frukost'],['l','L','lunch','lunch'],['d','M','dinner','middag']];
 
@@ -195,14 +215,14 @@ const MEALS = [['b','F','breakfast','frukost'],['l','L','lunch','lunch'],['d','M
 const S = {
   auth:null, demo:false, me:null, wageCodes:[], projects:[],
   cfg:{roles:{}, halveOnHalf:true, projectId:null},
-  trips:[], meals:{}, month:null, pending:null, selTrip:null,
+  trips:[], meals:{}, mileage:[], month:null, pending:null, selTrip:null,
   existing:[], status:{}, excluded:new Set(),
 };
 const store = {
   get(k,d){try{const v=localStorage.getItem('tk-trakt-'+k);return v?JSON.parse(v):d}catch(e){return d}},
   set(k,v){try{localStorage.setItem('tk-trakt-'+k,JSON.stringify(v))}catch(e){}}
 };
-function save(){store.set('cfg',S.cfg);store.set('trips',S.trips);store.set('meals',S.meals)}
+function save(){store.set('cfg',S.cfg);store.set('trips',S.trips);store.set('meals',S.meals);store.set('mileage',S.mileage)}
 
 // ---------- dates ----------
 const P = s => new Date(s+'T00:00:00Z');
@@ -225,6 +245,7 @@ function dayType(trip, d){
   return 'full';
 }
 function tripFor(d){return S.trips.find(t=>d>=t.start&&d<=t.end)}
+const parseQty = v => parseFloat(String(v??'').replace(/\s/g,'').replace(',','.'));
 
 function buildRows(){
   const rows=[];
@@ -254,7 +275,16 @@ function buildRows(){
       for(const x of Object.values(merged)){x.comment='Kostavdrag '+x.words.join(' + ')+(type==='half'?' (halvdag)':'');delete x.words;rows.push(x)}
     }
   }
-  rows.forEach(r=>r.key=[r.date,r.role,r.wageCodeID,r.price,r.quantity].join('|'));
+  // Milersättning: en rad per körning
+  for(const m of S.mileage){
+    const q=parseQty(m.quantity);
+    if(!m.date||!(q>0)) continue;
+    const rr=S.cfg.roles[m.type]||{};
+    rows.push({date:m.date,role:m.type,wageCodeID:rr.id,name:wc(rr.id)?.name||ROLES.find(x=>x.key===m.type).label,
+      quantity:q,price:+rr.price||0,ded:false,mile:true,projectID:m.projectId,comment:m.note||'Milersättning',uid:m.id});
+  }
+  rows.sort((a,b)=>a.date.localeCompare(b.date));
+  rows.forEach(r=>r.key=[r.date,r.role,r.wageCodeID,r.price,r.quantity,r.uid||''].join('|'));
   return rows;
 }
 
@@ -304,6 +334,8 @@ function demo(){
     {id:903,name:'Kostavdrag frukost (demo)',code:'K1',defaultPricePerUnit:60,isDeduction:true},
     {id:904,name:'Kostavdrag lunch (demo)',code:'K2',defaultPricePerUnit:105,isDeduction:true},
     {id:905,name:'Kostavdrag middag (demo)',code:'K3',defaultPricePerUnit:105,isDeduction:true},
+    {id:906,name:'Milersättning bensin, diesel bil (demo)',code:'M1',defaultPricePerUnit:25,isDeduction:false},
+    {id:907,name:'Milersättning el bil (demo)',code:'M2',defaultPricePerUnit:9.5,isDeduction:false},
   ];
   S.projects=[{id:1,projectNr:'1001',projectName:'Kund A – installation'},{id:2,projectNr:'1002',projectName:'Kund B – service'}];
   const st=$('#loginStatus'); st.className='status ok'; st.textContent='Demoläge: påhittade lönearter och projekt. Inget skickas till Timekeeper.';
@@ -320,7 +352,7 @@ function afterLoad(){
     S.cfg.roles[r.key]= w?{id:w.id,price:w.defaultPricePerUnit}:{id:null,price:0};
   }
   if(!S.projects.some(p=>p.id==S.cfg.projectId)) S.cfg.projectId=S.projects[0]?.id??null;
-  S.trips.forEach(t=>{ if(!S.projects.some(p=>p.id==t.projectId)) t.projectId=S.cfg.projectId; });
+  [...S.trips,...S.mileage].forEach(t=>{ if(!S.projects.some(p=>p.id==t.projectId)) t.projectId=S.cfg.projectId; });
   if(ROLES.some(r=>!S.cfg.roles[r.key].id)) $('#settings').open=true;
   save(); renderAll();
 }
@@ -373,7 +405,24 @@ async function send(){
 
 // ---------- rendering ----------
 const $ = s => document.querySelector(s);
-function renderAll(){renderCal();renderTrips();renderMapping();renderRows()}
+function renderAll(){renderCal();renderTrips();renderMapping();renderMileage();renderRows()}
+
+function renderMileage(){
+  const el=$('#mileage');
+  if(!S.mileage.length){el.innerHTML='<p class="small muted" style="margin:0">Inga körningar än.</p>';return}
+  const typeName=k=>{const w=S.wageCodes.find(w=>w.id==S.cfg.roles[k]?.id);return w?.name||ROLES.find(r=>r.key===k).label};
+  el.innerHTML=S.mileage.map(m=>{
+    const q=parseQty(m.quantity), price=+(S.cfg.roles[m.type]?.price)||0;
+    const sum = q>0 ? `${String(q).replace('.',',')} mil × ${kr(price)} = ${kr(q*price)}` : (m.quantity?'<span style="color:var(--err)">Ogiltigt antal</span>':'');
+    return `<div class="mile-row" data-mile="${m.id}">
+      <div><label>Datum</label><input type="date" data-mf="date" value="${m.date}"></div>
+      <div><label>Ersättning</label><select data-mf="type">${['mileFuel','mileEl'].map(k=>`<option value="${k}" ${m.type===k?'selected':''}>${esc(typeName(k))}</option>`).join('')}</select></div>
+      <div><label>Antal mil</label><input type="text" inputmode="decimal" data-mf="quantity" value="${esc(m.quantity)}" placeholder="0,0"><div class="sum">${sum}</div></div>
+      <div><label>Projekt</label><select data-mf="projectId">${projOptions(m.projectId)}</select></div>
+      <div><label>Kommentar (t.ex. sträcka)</label><input type="text" data-mf="note" value="${esc(m.note)}" placeholder="Stockholm – Uppsala t/r"></div>
+      <div class="del"><button data-mdel="${m.id}" title="Ta bort körningen">✕</button></div>
+    </div>`}).join('');
+}
 
 function renderCal(){
   const [y,m]=S.month.split('-').map(Number);
@@ -437,11 +486,11 @@ function renderMapping(){
 function renderRows(){
   const rows=buildRows();
   const pname=id=>{const p=S.projects.find(p=>p.id==id);return p?(p.projectNr||p.projectName):'–'};
-  if(!rows.length){$('#rows').innerHTML='<tr><td class="muted">Lägg till en resa i kalendern så visas raderna här.</td></tr>';$('#totals').innerHTML='';$('#btnSend').disabled=true;return}
-  let plus=0,minus=0;
+  if(!rows.length){$('#rows').innerHTML='<tr><td class="muted">Lägg till en resa i kalendern eller en körning så visas raderna här.</td></tr>';$('#totals').innerHTML='';$('#btnSend').disabled=true;return}
+  let plus=0,minus=0,miles=0;
   const body=rows.map(r=>{
     const inc=!S.excluded.has(r.key), sum=r.quantity*r.price;
-    if(inc){r.ded?minus+=sum:plus+=sum}
+    if(inc){r.ded?minus+=sum:r.mile?miles+=sum:plus+=sum}
     const st=S.status[r.key]; let stTxt='';
     if(st?.s==='ok') stTxt='<span class="st-ok">✓ Skapad</span>';
     else if(st?.s==='err') stTxt=`<span class="st-err" title="${esc(st.msg)}">✗ ${esc(st.msg).slice(0,60)}</span>`;
@@ -451,11 +500,11 @@ function renderRows(){
     return `<tr class="${r.ded?'ded':''} ${inc?'':'excluded'}">
       <td><input type="checkbox" data-inc="${esc(r.key)}" ${inc?'checked':''} ${st?.s==='ok'?'disabled':''}></td>
       <td>${r.date} <span class="muted">${fmtDow(r.date)}</span></td><td>${esc(r.name)}</td>
-      <td class="num-r">${r.quantity}</td><td class="num-r">${kr(r.price)}</td><td class="num-r">${r.ded?'−':''}${kr(sum)}</td>
+      <td class="num-r">${r.quantity.toLocaleString('sv-SE')}</td><td class="num-r">${kr(r.price)}</td><td class="num-r">${r.ded?'−':''}${kr(sum)}</td>
       <td>${esc(pname(r.projectID))}</td><td>${esc(r.comment)}</td><td>${stTxt}</td></tr>`}).join('');
   $('#rows').innerHTML=`<thead><tr><th></th><th>Datum</th><th>Löneart</th><th class="num-r">Antal</th><th class="num-r">À-pris</th><th class="num-r">Summa</th><th>Projekt</th><th>Kommentar</th><th>Status</th></tr></thead><tbody>${body}</tbody>`;
   const n=rows.filter(r=>!S.excluded.has(r.key)&&S.status[r.key]?.s!=='ok').length;
-  $('#totals').innerHTML=`<span>Traktamente <b>${kr(plus)}</b></span><span>Kostavdrag <b style="color:var(--err)">−${kr(minus)}</b></span><span>Netto <b>${kr(plus-minus)}</b></span><span class="muted">${n} rader att skicka</span>`;
+  $('#totals').innerHTML=`<span>Traktamente <b>${kr(plus)}</b></span><span>Kostavdrag <b style="color:var(--err)">−${kr(minus)}</b></span><span>Milersättning <b>${kr(miles)}</b></span><span>Totalt <b>${kr(plus-minus+miles)}</b></span><span class="muted">${n} rader att skicka</span>`;
   $('#btnSend').disabled=!n;
   $('#btnSend').textContent= S.confirmSend ? `Bekräfta: skapa ${n} rader` : `Skicka ${n} rader`;
   $('#btnCancel').hidden=!S.confirmSend;
@@ -503,6 +552,25 @@ $('#mapping').addEventListener('change',e=>{
   if(role){const w=S.wageCodes.find(w=>w.id==e.target.value);S.cfg.roles[role]={id:w?.id??null,price:w?.defaultPricePerUnit??0};renderMapping()}
   save();renderRows();
 });
+$('#btnAddMile').onclick=()=>{
+  const last=S.mileage[S.mileage.length-1];
+  const sel=S.trips.find(t=>t.id===S.selTrip);
+  S.mileage.push({id:Date.now().toString(36),date:last?.date||sel?.start||todayISO,type:last?.type||'mileFuel',
+    quantity:'',projectId:last?.projectId||sel?.projectId||S.cfg.projectId,note:''});
+  save();renderMileage();renderRows();
+  document.querySelector(`[data-mile="${S.mileage[S.mileage.length-1].id}"] [data-mf=quantity]`)?.focus();
+};
+$('#mileage').addEventListener('change',e=>{
+  const f=e.target.dataset.mf; if(!f) return;
+  const m=S.mileage.find(m=>m.id===e.target.closest('[data-mile]').dataset.mile);
+  m[f]= f==='projectId' ? +e.target.value : e.target.value;
+  save();renderMileage();renderRows();
+});
+$('#mileage').addEventListener('click',e=>{
+  const del=e.target.closest('[data-mdel]'); if(!del) return;
+  if(!del.classList.contains('armed')){del.classList.add('armed');del.textContent='Ta bort?';return}
+  S.mileage=S.mileage.filter(m=>m.id!==del.dataset.mdel);save();renderMileage();renderRows();
+});
 $('#halveOnHalf').onchange=e=>{S.cfg.halveOnHalf=e.target.checked;save();renderRows()};
 $('#defProject').onchange=e=>{S.cfg.projectId=+e.target.value;save()};
 $('#rows').addEventListener('change',e=>{
@@ -511,7 +579,7 @@ $('#rows').addEventListener('change',e=>{
 });
 
 // ---------- init ----------
-S.cfg={...S.cfg,...store.get('cfg',{})}; S.trips=store.get('trips',[]); S.meals=store.get('meals',{});
+S.cfg={...S.cfg,...store.get('cfg',{})}; S.trips=store.get('trips',[]); S.meals=store.get('meals',{}); S.mileage=store.get('mileage',[]);
 S.month=todayISO.slice(0,7);
 $('#supportContact').textContent=SUPPORT_CONTACT;
 renderAll();

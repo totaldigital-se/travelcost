@@ -10,7 +10,8 @@ I stället för att lägga in varje post för hand (hel- och halvdag, måltidsav
 2. Klicka på första och sista resdagen i kalendern.
 3. Fyll i avresetid, hemkomsttid, projekt och ort.
 4. Klicka i **F / L / M** för de dagar då frukost, lunch eller middag ingått.
-5. Kontrollera raderna och klicka på **Skicka**. Första klicket ändrar knappen till "Bekräfta", och andra klicket skickar raderna.
+5. Lägg till eventuella körningar under **Milersättning**: datum, biltyp (bensin/diesel eller el) och antal mil, med decimaler.
+6. Kontrollera raderna och klicka på **Skicka**. Första klicket ändrar knappen till "Bekräfta", och andra klicket skickar raderna.
 
 ## Regler
 
@@ -21,6 +22,7 @@ I stället för att lägga in varje post för hand (hel- och halvdag, måltidsav
 | Dagar däremellan | Hel dag |
 | Endagsresa | Inget traktamente, eftersom resan saknar övernattning |
 | Måltidsavdrag | En rad per måltid med lönearten för respektive måltid. På halvdagar halveras avdraget (kan stängas av under Inställningar) |
+| Milersättning | En rad per körning: antal mil × beloppet för lönearten (bensin/diesel eller el) |
 
 Beloppen hämtas alltid från lönearterna i Timekeeper. När Skatteverkets belopp ändras uppdaterar man lönearterna i Timekeeper. Sidan behöver inte ändras.
 
@@ -31,11 +33,12 @@ Sidan hanterar **inte**: nattraktamente, utlandstraktamente, sänkt traktamente 
 Överst i `<script>`-delen av `index.html`:
 
 ```js
-const DEFAULT_WAGE_CODES = { full: 11050, half: 12556, breakfast: 12543, lunch: 12544, dinner: 12545 };
+const DEFAULT_WAGE_CODES = { full: 11050, half: 12556, breakfast: 12543, lunch: 12544, dinner: 12545,
+                             mileFuel: null, mileEl: null };
 const SUPPORT_CONTACT = 'ekonomiavdelningen';
 ```
 
-- `DEFAULT_WAGE_CODES` innehåller ID:n för företagets lönearter i Timekeeper. Alla anställda får dem automatiskt. Den som vill kan byta löneart under *Inställningar*. Valet sparas då i den egna webbläsaren.
+- `DEFAULT_WAGE_CODES` innehåller ID:n för företagets lönearter i Timekeeper. Alla anställda får dem automatiskt. Den som vill kan byta löneart under *Inställningar*. Valet sparas då i den egna webbläsaren. Står det `null` letar sidan upp lönearten via namnet. För milersättning letar den efter "Milersättning" + "bensin/diesel" eller "el bil".
 - `SUPPORT_CONTACT` visas i sidfoten och i felmeddelanden.
 
 ## Säkerhet
